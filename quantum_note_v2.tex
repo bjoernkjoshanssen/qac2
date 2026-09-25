@@ -1,0 +1,1377 @@
+\documentclass[11pt]{amsart}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{hyperref}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{question}[theorem]{Question}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\AQ}{A_Q}
+\newcommand{\AP}{A_P}
+\newcommand{\gapp}{\operatorname{gap}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\wt}{\operatorname{wt}}
+\newcommand{\dz}[1]{\mathrm{d}_{\Z}(#1)}
+\DeclareMathOperator{\SO}{SO}
+\DeclareMathOperator{\SU}{SU}
+
+\title[Maximum-likelihood quantum automatic complexity]{Maximum-likelihood quantum automatic complexity}
+
+\author{Bj{\o}rn Kjos-Hanssen \\ Swarnalakshmi Lakshmanan}
+\address{University of Hawai\textquoteleft i at M\=anoa}
+\email{bjoern.kjos-hanssen@hawaii.edu}
+
+\date{\today}
+
+\begin{document}
+
+\begin{abstract}
+We introduce a maximum-likelihood variant $\AQ(w)$ of quantum automatic
+complexity: the least dimension $d$ such that two unitaries
+$U_0,U_1\in U(d)$, with initial state $e_1$ and a designated accepting
+basis state, make $w$ strictly the most likely accepted string of its
+length. This stands to the exact-acceptance complexity of
+\cite{KH17} as Gill's probabilistic complexity $\AP$ \cite{Gill24}
+stands to deterministic complexity. We prove that $\AQ(w)=2$ for
+\emph{every} nonempty string $w$, over every finite alphabet: a single
+universal pair of unitaries---lifts to $\SU(2)$ of two rotations
+generating a free group---witnesses every string, with acceptance
+probability exactly $1$, once the initial state is aimed at the
+rotation axis of $U(w)$. In the opposite direction, the
+gap-parameterized complexity $A_{Q,\delta}$ is unbounded for every
+fixed $\delta>0$: cube-free strings of length $n$ require dimension
+$\Omega_\delta(\log n)$, and so---in sharp contrast with the
+probabilistic case, where two states suffice forever---does the string
+$0^n$, because unitary dynamics is recurrent and admits no absorbing
+states. Finally we locate the computational difficulty of the
+underlying problems: finding the most likely string of a
+measure-once quantum automaton is NP-complete, with exact rational
+acceptance values and an inverse-polynomial promise gap, and verifying
+a claimed $\delta$-witness is coNP-complete, while the exact value of
+$A_{Q,\delta}(w)$ is computable in exponential time. All estimates
+are given with explicit constants and elementary proofs, with a view
+toward machine formalization.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+Gill \cite{Gill24} defined the probabilistic automatic complexity
+$\AP(w)$ of a finite string $w$: the least number of states of a
+probabilistic finite automaton for which $w$ is the unique most likely
+accepted string of its length. In the companion note \cite{KHpfa} it
+is shown that $\AP(w)\le3$ for every string, while the parameterized
+version $A_{P,\delta}$ ($\delta>0$) is unbounded. Here we carry out
+the analogous program for \emph{quantum} finite automata in the
+measure-once model of Moore and Crutchfield \cite{MC00}: unitary
+evolution, with a single projective measurement at the end of the
+input.
+
+Our results, in brief. At $\delta=0$ the complexity collapses
+completely: $\AQ(w)=2$ for every nonempty $w$
+(Theorem~\ref{thm:all}). This is strictly stronger than the classical
+situation, where two \emph{states} suffice only for a thin regular
+family of strings \cite[Theorem~4.1]{Gill24} and the sharp universal
+bound is three \cite{KHpfa}. The proof is short: if $R_0,R_1$ are
+rotations of the sphere generating a free group, then the rotations
+$R_z$, $z$ ranging over the strings of length $n$, are pairwise
+non-commuting, so the axis of $R_w$ is fixed by $R_w$ and by no other
+$R_z$; taking that axis as the initial \emph{and} accepting state
+makes $w$ the unique string accepted with probability $1$. The
+``memory'' of the automaton is thus a single point on the Bloch
+sphere. At fixed $\delta>0$ the complexity is unbounded
+(Theorems~\ref{thm:cubefree} and \ref{thm:zeros}), and here quantum
+mechanics is \emph{more} constrained than probability: classically
+$A_{P,\delta}(0^n)=2$ for all $n$ via an absorbing state, but unitary
+dynamics has no absorbing states, is recurrent, and forces
+$A_{Q,\delta}(0^n)\to\infty$. In slogan form: superposition is memory
+enough for any single string, but a quantum lock wears out. The
+complexity information of the measure-once model therefore resides
+entirely in the gap structure, and Section~\ref{sec:complexity} shows
+that this structure is computationally rich: the string-maximization
+problem for measure-once automata is NP-complete and
+$\delta$-witness verification is coNP-complete.
+
+This note is written with machine formalization in mind.
+Section~\ref{sec:notation} fixes all conventions, including the
+recursive definitions of the basic objects.
+Section~\ref{sec:toolbox} isolates the elementary ingredients: the
+Lipschitz property of the Born rule, a covering bound for spheres
+proved by volume comparison, simultaneous Dirichlet approximation
+proved by pigeonhole, the Lyndon--Sch\"utzenberger theorem on
+commuting words, and the dictionary between $\SU(2)$ and $\SO(3)$,
+each with an explicit-constant statement and a complete proof. Beyond
+finite-dimensional linear algebra and two classical facts---the
+Lyndon--Sch\"utzenberger theorem and the existence of two rotations
+generating a free group---the note is self-contained; no compactness,
+measure theory, or genericity is used.
+
+\section{Notation and conventions}\label{sec:notation}
+
+\subsection*{Vectors and matrices}
+$\C^d$ carries the inner product
+$\langle x|y\rangle=\sum_{j=1}^d\overline{x_j}\,y_j$, conjugate-linear
+in the \emph{first} argument, with norm $\|x\|=\langle
+x|x\rangle^{1/2}$; $e_1,\dots,e_d$ is the standard basis. By
+Cauchy--Schwarz, $|\langle x|y\rangle|\le\|x\|\,\|y\|$, with equality
+for unit vectors if and only if $x$ and $y$ are parallel. For a
+$d\times d$ complex matrix $A$, $\|A\|$ denotes the operator norm
+$\sup_{\|x\|=1}\|Ax\|$; it is submultiplicative, and
+$|\langle x|Ay\rangle|\le\|A\|$ whenever $\|x\|=\|y\|=1$. $A^\dagger$
+is the conjugate transpose; $U(d)$ is the group of unitary matrices
+($U^\dagger U=I$) and $\SU(d)$ its subgroup of determinant one.
+Unitaries are isometries: $\|Ux\|=\|x\|$. Conjugation by a unitary
+preserves the operator norm. We use throughout: if $U=VDV^\dagger$
+with $V$ unitary and $D=\operatorname{diag}
+(e^{i\theta_1},\dots,e^{i\theta_d})$, then
+$\|U^p-I\|=\|D^p-I\|=\max_j|e^{ip\theta_j}-1|$.
+
+\subsection*{Real distances}
+For $t\in\R$, $\dz{t}=\min_{k\in\Z}|t-k|$ is the distance to the
+nearest integer.
+
+\subsection*{Strings}
+A \emph{binary string} of length $n\ge0$ is a function
+$w\colon\{1,\dots,n\}\to\{0,1\}$, written $w=w_1w_2\cdots w_n$; the set
+of such is $\{0,1\}^n$, and $\{0,1\}^*$ is the free monoid of all
+binary strings under concatenation, written by juxtaposition, with
+the empty string as identity. For $0\le i\le j\le n$, the
+\emph{factor} $w_{(i,j]}$ is the string $w_{i+1}w_{i+2}\cdots w_j$ of
+length $j-i$, and $w_{[1,m]}=w_{(0,m]}$ is a \emph{prefix}. The
+\emph{reversal} is $w^R_m=w_{n+1-m}$. A nonempty string $u$ is
+\emph{primitive} if $u=v^k$ implies $k=1$. A string $w$ is
+\emph{cube-free} if there is no nonempty $u$ with $uuu$ a factor of
+$w$.
+
+\subsection*{Automata}
+Fix $U_0,U_1\in U(d)$. Define $U(z)$ for $z\in\{0,1\}^m$ recursively
+by $U(\text{empty string})=I$ and
+$U(z)=U_{z_m}\,U(z_{[1,m-1]})$; explicitly,
+$U(z)=U_{z_m}U_{z_{m-1}}\cdots U_{z_1}$, so that the \emph{first}
+letter of $z$ acts \emph{first} (rightmost in the operator
+product). Given also an accepting index $k\in\{1,\dots,d\}$, the
+acceptance probability of $z\in\{0,1\}^n$ is
+\[
+  \rho(z)=\bigl|\langle e_k|U(z)e_1\rangle\bigr|^2\in[0,1].
+\]
+
+\begin{definition}\label{def:AQ}
+Let $w\in\{0,1\}^n$, $n\ge1$. A \emph{$d$-dimensional quantum witness}
+for $w$ is a triple $(U_0,U_1,k)$ as above such that
+\[
+  \gapp(w):=\min_{z\in\{0,1\}^n\setminus\{w\}}
+  \bigl(\rho(w)-\rho(z)\bigr)>0 .
+\]
+The \emph{maximum-likelihood quantum automatic complexity} $\AQ(w)$ is
+the least $d$ admitting a $d$-dimensional quantum witness for $w$, and
+for $\delta>0$,
+\[
+  A_{Q,\delta}(w)=\min\{\,d:\text{some $d$-dimensional witness for $w$
+    has }\gapp(w)\ge\delta\,\}.
+\]
+\end{definition}
+
+Thus the automaton reads $w$ left to right, is started in the basis
+state $e_1$, and accepts by measuring onto the basis state $e_k$; the
+case $k=1$, in which the accepting state \emph{is} the initial state,
+is allowed. The exact-acceptance complexities $Q$, $Q_s$, $Q_f$ of
+\cite{KH17} require the stronger condition $U(w)e_1\in\C e_k$ together
+with the exclusion of all other strings of the same length from the
+ray $\C e_k$; maximum-likelihood acceptance is the natural relaxation,
+and the direct quantum analogue of Gill's $\AP$.
+
+\section{Basic properties}\label{sec:basic}
+
+\begin{proposition}\label{prop:basic}
+For every nonempty binary string $w$:
+\begin{enumerate}
+\item $\AQ(w)\ge2$;
+\item $\AQ(\bar w)=\AQ(w)$, where $\bar w$ exchanges the letters
+  $0\leftrightarrow1$;
+\item $\AQ(w^R)=\AQ(w)$;
+\item $\AQ(w)\le Q_s(w)$, the semi-classical exact-acceptance
+complexity of \cite{KH17}.
+\end{enumerate}
+The same statements hold for $A_{Q,\delta}$ in place of $\AQ$, for
+each fixed $\delta$, except that in (4) the conclusion reads
+$A_{Q,\delta_0}(w)\le Q_s(w)$ where
+$\delta_0=\gapp$ of the exact witness.
+\end{proposition}
+
+\begin{proof}
+(1) If $d=1$ then $U_0=(e^{i\beta_0})$ and $U_1=(e^{i\beta_1})$ are
+unimodular scalars, so $U(z)$ is unimodular and $\rho(z)=1$ for every
+$z$; since $n\ge1$ there are at least two strings of length $n$, and
+no string is a strict maximizer.
+
+(2) If $(U_0,U_1,k)$ witnesses $w$, then $(U_1,U_0,k)$ witnesses
+$\bar w$ with the same gap, since the roles of the letters are
+exchanged.
+
+(3) Let $(U_0,U_1,k)$ witness $w$, and let $P$ be the permutation
+matrix with $Pe_1=e_k$, $Pe_k=e_1$, and $Pe_j=e_j$ otherwise ($P=I$ if
+$k=1$); note $P=P^\dagger=P^{-1}$ and $P$ is unitary. Put
+$W_b=PU_b^\dagger P$ for $b\in\{0,1\}$; these are unitary. For any
+$z\in\{0,1\}^n$, using $|\langle x|y\rangle|=|\langle y|x\rangle|$ and
+inserting $P^2=I$ between all factors,
+\begin{align*}
+  \bigl|\langle e_k|U(z)e_1\rangle\bigr|
+  &=\bigl|\langle e_1|U(z)^\dagger e_k\rangle\bigr|
+   =\bigl|\langle e_1|U_{z_1}^\dagger U_{z_2}^\dagger\cdots
+     U_{z_n}^\dagger e_k\rangle\bigr|\\
+  &=\bigl|\langle Pe_1|\,(PU_{z_1}^\dagger P)(PU_{z_2}^\dagger P)\cdots
+     (PU_{z_n}^\dagger P)\,Pe_k\rangle\bigr|
+   =\bigl|\langle e_k|W_{z_1}W_{z_2}\cdots W_{z_n}\,e_1\rangle\bigr| .
+\end{align*}
+Now $W_{z_1}W_{z_2}\cdots W_{z_n}=W(z^R)$: indeed the recursive
+definition gives
+$W(z^R)=W_{(z^R)_n}\cdots W_{(z^R)_1}$ and $(z^R)_m=z_{n+1-m}$, so the
+factors are $W_{z_1},W_{z_2},\dots,W_{z_n}$ from left to right. Hence
+the triple $(W_0,W_1,k)$ assigns to each $z^R$ the same acceptance
+probability that $(U_0,U_1,k)$ assigns to $z$; since $z\mapsto z^R$ is
+a bijection of $\{0,1\}^n$, the gap of $(W_0,W_1,k)$ at $w^R$ equals
+the gap of $(U_0,U_1,k)$ at $w$. This proves $\AQ(w^R)\le\AQ(w)$, and
+equality follows by applying the inequality to $w^R$.
+
+(4) By definition an exact witness of dimension $d=Q_s(w)$ has
+$U(w)e_1=\lambda e_k$ with $|\lambda|=1$, so $\rho(w)=1$, while for
+$z\ne w$ of the same length $U(z)e_1\notin\C e_k$. If $\rho(z)=1$ for
+such $z$, then $|\langle e_k|U(z)e_1\rangle|=1=\|U(z)e_1\|$, and
+equality in Cauchy--Schwarz forces $U(z)e_1\in\C e_k$, a
+contradiction; hence $\rho(z)<1=\rho(w)$ for all $z\ne w$ and the gap
+is positive.
+\end{proof}
+
+\section{Toolbox}\label{sec:toolbox}
+
+This section collects the elementary lemmas used in the main
+arguments. Throughout, constants are explicit.
+
+\begin{lemma}[Scalar bounds]\label{lem:scalar}
+\emph{(a)} For all real $\beta\ge0$ and integers $n\ge0$,
+$(1+\beta)^n\le e^{n\beta}$.
+\emph{(b)} For all real $t$,
+$|e^{2\pi it}-1|=2|\sin\pi t|\le2\pi\,\dz{t}$.
+\end{lemma}
+
+\begin{proof}
+(a) $(1+\beta)^n=\sum_{j=0}^n\binom nj\beta^j$ and
+$\binom nj\le n^j/j!$, so $(1+\beta)^n\le\sum_{j\ge0}(n\beta)^j/j!
+=e^{n\beta}$.
+(b) $|e^{2\pi it}-1|^2=(\cos2\pi t-1)^2+\sin^22\pi t
+=2-2\cos2\pi t=4\sin^2\pi t$. Both sides are invariant under
+$t\mapsto t+1$ and $t\mapsto-t$, so we may assume
+$0\le t\le\tfrac12$, where $t=\dz t$ and $\sin\pi t\le\pi t$.
+\end{proof}
+
+\begin{lemma}[Born rule is $2$-Lipschitz]\label{lem:born}
+Let $x,y\in\C^d$ with $\|x\|,\|y\|\le1$ and let $e$ be a unit
+vector. Then
+$\bigl|\,|\langle e|x\rangle|^2-|\langle e|y\rangle|^2\,\bigr|
+\le2\|x-y\|$.
+\end{lemma}
+
+\begin{proof}
+Write $a=\langle e|x\rangle$, $b=\langle e|y\rangle$; then
+$|a|,|b|\le1$ and
+$\bigl||a|^2-|b|^2\bigr|=(|a|+|b|)\bigl||a|-|b|\bigr|
+\le2|a-b|=2|\langle e|x-y\rangle|\le2\|x-y\|$
+by the triangle and Cauchy--Schwarz inequalities.
+\end{proof}
+
+\begin{lemma}[Sphere partition]\label{lem:partition}
+Let $D\ge1$ and $0<\varepsilon\le1$. The unit sphere
+$S=\{x\in\R^D:\|x\|=1\}$ can be partitioned into
+$N\le(5/\varepsilon)^D$ sets, each of diameter at most $\varepsilon$.
+\end{lemma}
+
+\begin{proof}
+Let $\{x_1,\dots,x_N\}\subseteq S$ be a maximal subset whose points
+have pairwise distances $>\varepsilon/2$. The open balls
+$B(x_i,\varepsilon/4)$ are pairwise disjoint and contained in the ball
+$B(0,1+\varepsilon/4)$; comparing volumes in $\R^D$,
+\[
+  N\Bigl(\frac\varepsilon4\Bigr)^D\le\Bigl(1+\frac\varepsilon4\Bigr)^D,
+  \qquad\text{so}\qquad
+  N\le\Bigl(1+\frac4\varepsilon\Bigr)^D\le\Bigl(\frac5\varepsilon\Bigr)^D,
+\]
+using $\varepsilon\le1$ in the last step. By maximality, every point
+of $S$ is within $\varepsilon/2$ of some $x_i$. Define
+$C_i=\{x\in S:\ i\text{ is the least index with }
+\|x-x_i\|=\min_j\|x-x_j\|\}$; the $C_i$ partition $S$, each
+$x\in C_i$ satisfies $\|x-x_i\|\le\varepsilon/2$, and hence
+$\operatorname{diam}C_i\le\varepsilon$.
+\end{proof}
+
+\begin{lemma}[Simultaneous Dirichlet approximation]\label{lem:dirichlet}
+Let $x_1,\dots,x_D\in\R$ and let $Q\ge1$ be an integer. There is an
+integer $p$ with $1\le p\le Q^D$ and $\dz{px_j}\le1/Q$ for all
+$j=1,\dots,D$.
+\end{lemma}
+
+\begin{proof}
+For $p=0,1,\dots,Q^D$ consider the fractional-part vectors
+$v_p=(\{px_1\},\dots,\{px_D\})\in[0,1)^D$. Partition $[0,1)^D$ into
+$Q^D$ boxes $\prod_j[a_j/Q,(a_j+1)/Q)$, $a_j\in\{0,\dots,Q-1\}$. By
+pigeonhole two of the $Q^D+1$ vectors, say $v_{p_1}$ and $v_{p_2}$
+with $p_1<p_2$, lie in the same box, so
+$|\{p_2x_j\}-\{p_1x_j\}|<1/Q$ for every $j$. Put $p=p_2-p_1\in
+[1,Q^D]$. For each $j$, $px_j$ differs from
+$\{p_2x_j\}-\{p_1x_j\}$ by an integer, whence
+$\dz{px_j}\le|\{p_2x_j\}-\{p_1x_j\}|<1/Q$.
+\end{proof}
+
+Next, the combinatorics-on-words input.
+
+\begin{lemma}[Lyndon--Sch\"utzenberger; commuting words]\label{lem:LS}
+\emph{(a)} If nonempty strings $x,y$ satisfy $xy=yx$, then there are a
+string $u$ and integers $s,t\ge1$ with $x=u^s$ and $y=u^t$.
+\emph{(b)} Every nonempty string $x$ has a unique primitive string $u$
+such that $x=u^s$ for some $s\ge1$ (the \emph{primitive root} of
+$x$).
+\emph{(c)} If $x,y$ are strings of the same length with $xy=yx$, then
+$x=y$.
+\end{lemma}
+
+\begin{proof}
+See \cite{LS62} for (a) and \cite[Section~1.3]{Lothaire} for both; (b)
+follows from (a): if $x=u^s=v^t$ with $u,v$ primitive, then $u$ and
+$v$ commute with $x$, hence, by (a) applied twice, are powers of a
+common string, and primitivity forces $u=v$. For (c): if $x,y$ are
+empty there is nothing to prove; otherwise (a) gives $x=u^s$, $y=u^t$
+with $u$ nonempty, and $|x|=|y|$ forces $s=t$.
+\end{proof}
+
+Finally, the dictionary between $\SU(2)$ and rotations of the sphere,
+and the one fact about rotations that drives Section~\ref{sec:all}.
+Let $\sigma_1,\sigma_2,\sigma_3$ be the Pauli matrices and, for
+$a\in\R^3$, write $a\cdot\sigma=\sum_ja_j\sigma_j$; every Hermitian
+$2\times2$ matrix of trace $1$ has the form $\frac12(I+a\cdot\sigma)$
+for a unique $a\in\R^3$, and it is a rank-one projection
+$|f\rangle\langle f|$ ($f$ a unit vector) if and only if $\|a\|=1$. The
+vector $a=\hat f$ is the \emph{Bloch vector} of $f$; it depends only
+on the ray $\C f$.
+
+\begin{lemma}[Rotations and rays]\label{lem:bloch}
+\begin{enumerate}
+\item For each $U\in\SU(2)$ there is a unique $R_U\in\SO(3)$ with
+  $U(a\cdot\sigma)U^\dagger=(R_Ua)\cdot\sigma$ for all $a\in\R^3$;
+  the map $U\mapsto R_U$ is a group homomorphism onto $\SO(3)$ with
+  kernel $\{\pm I\}$.
+\item For a unit vector $f\in\C^2$ and $U\in\SU(2)$: $Uf\in\C f$ if
+  and only if $R_U\hat f=\hat f$.
+\item A rotation $R\in\SO(3)$ with $R\ne I$ fixes exactly two unit
+  vectors, $\pm a$ (its \emph{axis}); and if two rotations $R,R'\ne I$
+  have a common fixed unit vector then $RR'=R'R$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(1) is the standard double cover $\SU(2)\to\SO(3)$ (see e.g.\
+\cite[Ch.~2]{Wagon}): conjugation by $U$ preserves the real vector
+space of traceless Hermitian matrices $\{a\cdot\sigma\}$ and the
+quadratic form $\det(a\cdot\sigma)=-\|a\|^2$, so it acts by an
+orthogonal map $R_U$, which is a rotation by connectedness of
+$\SU(2)$; the map is a homomorphism because conjugation is, its image
+is all of $\SO(3)$, and $R_U=I$ iff $U$ commutes with all
+$a\cdot\sigma$, i.e.\ $U=\pm I$.
+
+(2) $Uf\in\C f$ iff $U|f\rangle\langle f|U^\dagger=|f\rangle\langle
+f|$. Writing $|f\rangle\langle f|=\frac12(I+\hat f\cdot\sigma)$, the
+left side is $\frac12(I+(R_U\hat f)\cdot\sigma)$ by (1), and two
+matrices $\frac12(I+a\cdot\sigma)$, $\frac12(I+a'\cdot\sigma)$ are
+equal iff $a=a'$.
+
+(3) A rotation $R\ne I$ of $\R^3$ has $1$ as a simple eigenvalue (its
+eigenvalues are $1,e^{\pm i\theta}$ with $\theta\not\equiv0$), so its
+fixed unit vectors are $\pm a$ for a unit eigenvector $a$. If $R,R'\ne
+I$ both fix $a$, then both restrict to rotations of the plane
+$a^\perp$, and rotations of a plane commute; as both fix $a$ as well,
+$RR'=R'R$.
+\end{proof}
+
+\begin{lemma}[A free pair of rotations]\label{lem:free}
+Let $R_0,R_1\in\SO(3)$ be the rotations by the angle $\arccos\frac13$
+about the $x$-axis and about the $z$-axis, respectively. Then
+$R_0,R_1$ generate a free group of rank two: no nonempty reduced word
+in $R_0^{\pm1},R_1^{\pm1}$ equals $I$.
+\end{lemma}
+
+\begin{proof}
+This is \'Swierczkowski's theorem \cite{Sw58}; a complete elementary
+proof is in \cite[Theorem~2.1]{Wagon}. (One shows by induction on the
+length of a reduced word that it maps $(0,1,0)^T$ to a vector of the
+form $3^{-k}(a\sqrt2,b,c\sqrt2)$ with $a,b,c\in\Z$ and $b\not\equiv0
+\pmod3$, so the word is not the identity.)
+\end{proof}
+
+\section{All strings have complexity two}\label{sec:all}
+
+For $R_0,R_1\in\SO(3)$ and $z\in\{0,1\}^n$ write, in parallel with the
+automaton convention, $R_z=R_{z_n}\cdots R_{z_1}$.
+
+\begin{lemma}\label{lem:comm}
+Let $R_0,R_1$ generate a free group of rank two. If $z\ne w$ are
+binary strings of the same length $n\ge1$, then $R_z\ne I$, $R_w\ne
+I$, and $R_zR_w\ne R_wR_z$.
+\end{lemma}
+
+\begin{proof}
+A nonempty positive word in $R_0,R_1$ (no inverses) is a nonempty
+reduced word, hence $\ne I$ by freeness; this gives $R_z,R_w\ne I$.
+Suppose $R_zR_w=R_wR_z$. Both sides are positive words of length
+$2n$, spelled by the strings $wz$ and $zw$ respectively (recall that
+the first letter of a string is the rightmost factor). In a free group
+two reduced words that represent the same element are identical
+letter by letter, so $wz=zw$ in the free monoid $\{0,1\}^*$, and
+Lemma~\ref{lem:LS}(c) gives $z=w$.
+\end{proof}
+
+\begin{theorem}\label{thm:all}
+Let $R_0,R_1\in\SO(3)$ generate a free group of rank two (for
+instance the pair of Lemma~\ref{lem:free}), and let $U_0,U_1\in\SU(2)$
+be any lifts, $R_{U_b}=R_b$. Let $w\in\{0,1\}^n$, $n\ge1$, let $f$ be
+a unit eigenvector of $U(w)$, and let $V\in\SU(2)$ satisfy
+$Ve_1=f$. Then $(V^\dagger U_0V,\;V^\dagger U_1V,\;k=1)$ is a
+$2$-dimensional quantum witness for $w$ with $\rho(w)=1$.
+Consequently
+\[
+  \AQ(w)=2\qquad\text{for every nonempty binary string }w .
+\]
+\end{theorem}
+
+\begin{proof}
+Since $U\mapsto R_U$ is a homomorphism, $R_{U(z)}=R_{z_n}\cdots
+R_{z_1}=R_z$ for every string $z$. By Lemma~\ref{lem:comm}, $R_w\ne
+I$, so by Lemma~\ref{lem:bloch}(3) $R_w$ has an axis $\pm a$, and
+$U(w)$---which has two orthogonal unit eigenvectors, as a unitary
+$2\times2$ matrix---has by Lemma~\ref{lem:bloch}(2) exactly the
+eigenvectors with Bloch vector $\pm a$. So $\hat f=\pm a$ and
+$U(w)f=\lambda f$ with $|\lambda|=1$, whence
+$\rho(w)=|\langle f|U(w)f\rangle|^2=1$ for the triple
+$(U_0,U_1)$ with initial and accepting vector $f$.
+
+Let $z\ne w$ have length $n$. If $U(z)f\in\C f$ then, by
+Lemma~\ref{lem:bloch}(2), $R_z$ fixes $\hat f=\pm a$; as $R_z\ne I$
+(Lemma~\ref{lem:comm}), $R_z$ and $R_w$ are rotations $\ne I$ with a
+common fixed unit vector, so they commute by
+Lemma~\ref{lem:bloch}(3), contradicting Lemma~\ref{lem:comm}. Hence
+$U(z)f\notin\C f$, and by the equality case of Cauchy--Schwarz,
+$|\langle f|U(z)f\rangle|<1$.
+
+Finally, conjugation by $V$ moves $f$ to $e_1$ without changing any
+amplitude: with $U'_b=V^\dagger U_bV$ we have $U'(z)=V^\dagger U(z)V$
+and $\langle e_1|U'(z)e_1\rangle=\langle Ve_1|U(z)Ve_1\rangle=\langle
+f|U(z)f\rangle$. Thus for the triple $(U'_0,U'_1,1)$ we have
+$\rho(w)=1>\rho(z)$ for every $z\ne w$ of length $n$, i.e.\
+$\gapp(w)>0$, and $\AQ(w)\le2$. The lower bound is
+Proposition~\ref{prop:basic}(1).
+\end{proof}
+
+\begin{remark}[Universality and explicitness]\label{rem:universal}
+The pair $(U_0,U_1)$ in Theorem~\ref{thm:all} does not depend on $w$:
+one fixed pair of $2\times2$ unitaries witnesses every string of every
+length, and only the initial state $f$---the axis of $R_w$---changes.
+With the rotations of Lemma~\ref{lem:free} the lifts can be taken as
+$U_0=\cos\frac\theta2\,I-i\sin\frac\theta2\,\sigma_1$ and
+$U_1=\cos\frac\theta2\,I-i\sin\frac\theta2\,\sigma_3$,
+$\theta=\arccos\frac13$, so $\cos\frac\theta2=\sqrt{2/3}$ and
+$\sin\frac\theta2=\sqrt{1/3}$: all entries lie in $\Q(\sqrt2,\sqrt3,i)$,
+and $f$ is an eigenvector of a product of $n$ such matrices. An
+exhaustive computation with this pair confirms $\rho(w)=1>\max_{z\ne
+w}\rho(z)$ for all $2^n$ strings of every length $n\le12$; the
+smallest gap over all strings of length $n$ is approximately
+$3.3\cdot10^{-1}$, $3.3\cdot10^{-1}$, $7.3\cdot10^{-2}$,
+$4.0\cdot10^{-2}$, $2.7\cdot10^{-4}$, $6.7\cdot10^{-4}$,
+$3.0\cdot10^{-5}$, $6.7\cdot10^{-5}$, $3.8\cdot10^{-5}$,
+$2.4\cdot10^{-7}$, $1.6\cdot10^{-7}$, $3.0\cdot10^{-8}$ for
+$n=1,\dots,12$. This rapid decay is forced: see
+Section~\ref{sec:delta}.
+\end{remark}
+
+\begin{remark}[Alphabets]\label{rem:alphabets}
+Definition~\ref{def:AQ} extends verbatim to an alphabet of any size
+$m\ge1$, and so does Theorem~\ref{thm:all}: $\SO(3)$ contains free
+subgroups of every finite rank (a free group of rank two contains
+free subgroups of all finite ranks, e.g.\ generated by
+$R_0^jR_1R_0^{-j}$, $1\le j\le m$), and Lemma~\ref{lem:comm} only uses
+that positive words of equal length that commute are equal, which
+holds over every alphabet. Thus every nonempty string over every
+finite alphabet has maximum-likelihood quantum automatic complexity
+exactly two.
+\end{remark}
+
+\begin{remark}[Comparison with exact acceptance]\label{rem:lock}
+The witness of Theorem~\ref{thm:all} is exact in the sense of
+\cite{KH17}---$w$ is accepted with certainty and every other string of
+its length with probability $<1$---but its accepting state coincides
+with its initial state ($k=1$). In the lock metaphor of \cite{KH17}
+the lock starts \emph{unlocked}, is scrambled by every wrong code, and
+is restored exactly by the right one. Insisting on $k=2$ (start
+locked, end unlocked) changes the geometry: $R_w$ must then be a
+half-turn and $\hat f$ must lie on its equator, and one checks in the
+same way that such a witness exists if and only if some pair
+$(R_0,R_1)$ has $R_w$ a half-turn and $R_z\ne R_w$ for all $z\ne w$
+of the same length. That is a codimension-one condition on the pair,
+outside the reach of the free-group argument; whether it can always be
+met, i.e.\ whether the exact complexities of \cite{KH17} also collapse
+to $2$, we leave open.
+\end{remark}
+
+\begin{remark}
+The contrast with the classical case is stark: $2$-state probabilistic
+witnesses exist only for the thin regular family classified in
+\cite[Theorem~4.1]{Gill24}, and $\AP$ attains the value $3$, whereas
+quantumly, dimension $2$ suffices universally. The geometric reason
+is that the pure-state space of a $2$-state PFA is a $1$-dimensional
+simplex on which the dynamics is monotone, whereas the pure-state
+space of a qubit is a $2$-sphere on which unitaries act as rotations,
+and a free group of rotations moves every point to $2^n$ pairwise
+distinct places. Hence the complexity information of the measure-once
+model resides entirely in the gap structure, to which we now turn.
+\end{remark}
+
+\section{Fixed gaps: \texorpdfstring{$A_{Q,\delta}$}{A(Q,delta)} is
+unbounded}\label{sec:delta}
+
+The universal witnesses of Theorem~\ref{thm:all} have gaps that
+decay rapidly in $n$ (Remark~\ref{rem:universal}). We now show this
+is forced, for every witness in any fixed dimension. Recall that the Thue--Morse word is
+overlap-free, hence cube-free, and so are all its prefixes
+\cite[Ch.~1]{AS03}; thus cube-free binary strings of every length
+exist.
+
+Fix a $d$-dimensional witness datum $(U_0,U_1,k)$ and a string
+$w\in\{0,1\}^n$, and define the \emph{prefix states}
+\[
+  \psi_0=e_1,\qquad \psi_m=U_{w_m}\psi_{m-1}
+  \quad(1\le m\le n),
+\]
+so that $\psi_m=U(w_{[1,m]})e_1$ and $\|\psi_m\|=1$ for all $m$.
+
+\begin{lemma}[Block swap]\label{lem:qswap}
+Let $0\le i<j<l\le n$ be indices with
+\[
+  \|\psi_i-\psi_j\|\le\varepsilon,\qquad
+  \|\psi_j-\psi_l\|\le\varepsilon,\qquad
+  \|\psi_i-\psi_l\|\le\varepsilon .
+\]
+Write $B_1=w_{(i,j]}$, $B_2=w_{(j,l]}$, $S=w_{(l,n]}$ (so
+$w=w_{[1,i]}B_1B_2S$ with $B_1,B_2$ nonempty), and let
+$z=w_{[1,i]}B_2B_1S\in\{0,1\}^n$. Then:
+\begin{enumerate}
+\item $|\rho(z)-\rho(w)|\le6\varepsilon$;
+\item $z=w$ if and only if $B_1B_2=B_2B_1$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(1) By the recursive definition of $U(\cdot)$ and of the prefix
+states, $U(B_1)\psi_i=\psi_j$ and $U(B_2)\psi_j=\psi_l$, and
+\[
+  U(w)e_1=U(S)\,U(B_2)U(B_1)\,\psi_i,
+  \qquad
+  U(z)e_1=U(S)\,U(B_1)U(B_2)\,\psi_i .
+\]
+Since unitaries are isometries,
+\[
+  U(B_2)\psi_i=U(B_2)\psi_j+U(B_2)(\psi_i-\psi_j)
+  =\psi_l+d_1,\qquad
+  \|d_1\|=\|\psi_i-\psi_j\|\le\varepsilon,
+\]
+and therefore
+\[
+  U(B_1)U(B_2)\psi_i
+  =U(B_1)\psi_i+U(B_1)(\psi_l-\psi_i)+U(B_1)d_1
+  =\psi_j+U(B_1)(\psi_l-\psi_i)+U(B_1)d_1 .
+\]
+Comparing with $U(B_2)U(B_1)\psi_i=\psi_l$ and using the triangle
+inequality and isometry again,
+\[
+  \bigl\|U(B_1)U(B_2)\psi_i-U(B_2)U(B_1)\psi_i\bigr\|
+  \le\|\psi_j-\psi_l\|+\|\psi_l-\psi_i\|+\|\psi_i-\psi_j\|
+  \le3\varepsilon .
+\]
+Applying the isometry $U(S)$ and Lemma~\ref{lem:born} gives
+$|\rho(z)-\rho(w)|\le2\cdot3\varepsilon=6\varepsilon$.
+
+(2) $z$ and $w$ have the common prefix $w_{[1,i]}$ and the common
+suffix $S$, and between them the factors $B_2B_1$ and $B_1B_2$, which
+have the same length $l-i$; hence $z=w$ iff $B_2B_1=B_1B_2$.
+\end{proof}
+
+\begin{theorem}\label{thm:cubefree}
+Let $\delta\in(0,1]$ and let $w\in\{0,1\}^n$ be cube-free. Then every
+$d$-dimensional quantum witness for $w$ with $\gapp(w)\ge\delta$
+satisfies
+\[
+  n+1\;\le\;3\,\Bigl(\frac{35}{\delta}\Bigr)^{2d},
+  \qquad\text{hence}\qquad
+  d\;\ge\;\frac{\log\bigl((n+1)/3\bigr)}{2\log(35/\delta)} .
+\]
+In particular $A_{Q,\delta}$ is unbounded along the Thue--Morse
+prefixes, for every fixed $\delta>0$.
+\end{theorem}
+
+\begin{proof}
+The unit sphere of $\C^d$ is the unit sphere of $\R^{2d}$ under the
+standard identification, which is norm-preserving. By
+Lemma~\ref{lem:partition} with $D=2d$ and $\varepsilon=\delta/7\le1$,
+partition it into $N\le(35/\delta)^{2d}$ cells of diameter at most
+$\delta/7$. The $n+1$ prefix states $\psi_0,\dots,\psi_n$ each lie in
+some cell. We claim no cell contains $\psi_{i}$ for four distinct
+indices; then $n+1\le3N$, which is the assertion.
+
+First, if $i<j<l$ lie in one cell, then the hypotheses of
+Lemma~\ref{lem:qswap} hold with $\varepsilon=\delta/7$, so the swapped
+string $z$ satisfies $|\rho(z)-\rho(w)|\le6\delta/7<\delta$. If
+$z\ne w$ this contradicts $\gapp(w)\ge\delta$; hence $z=w$, i.e.\
+$B_1B_2=B_2B_1$ by Lemma~\ref{lem:qswap}(2), and by
+Lemma~\ref{lem:LS}(a) the nonempty blocks $B_1,B_2$ are powers of a
+common string, which we may take to be the primitive root $u$ of
+$B_2$ (Lemma~\ref{lem:LS}(b)).
+
+Now suppose $i_1<i_2<i_3<i_4$ lie in one cell, with consecutive
+blocks $B_1=w_{(i_1,i_2]}$, $B_2=w_{(i_2,i_3]}$,
+$B_3=w_{(i_3,i_4]}$, all nonempty. Applying the previous paragraph to
+the triple $(i_1,i_2,i_3)$: $B_1,B_2\in\{u^s:s\ge1\}$ where $u$ is
+the primitive root of $B_2$. Applying it to the triple
+$(i_2,i_3,i_4)$: $B_2,B_3\in\{v^s:s\ge1\}$ where $v$ is the primitive
+root of $B_2$---the \emph{same} $B_2$---so $v=u$ by uniqueness
+(Lemma~\ref{lem:LS}(b)). Hence
+$w_{(i_1,i_4]}=B_1B_2B_3=u^{s_1+s_2+s_3}$ with each $s_i\ge1$, so
+$uuu$ is a factor of $w$: a cube, contradicting cube-freeness.
+\end{proof}
+
+Classically the periodicity escape is real: $A_{P,\delta}(0^n)=2$ for
+all $n$ and all $\delta\le1$, via a two-state automaton with an
+absorbing reject state \cite{KHpfa}. Quantum mechanically there are no
+absorbing states, and recurrence closes the escape:
+
+\begin{theorem}\label{thm:zeros}
+Let $\delta\in(0,1]$. Every $d$-dimensional quantum witness for $0^n$
+with $\gapp(0^n)\ge\delta$ satisfies
+\[
+  n\;<\;\Bigl(\frac{52}{\delta}\Bigr)^{2d},
+  \qquad\text{hence}\qquad
+  A_{Q,\delta}(0^n)\;\ge\;\frac{\log n}{2\log(52/\delta)} .
+\]
+\end{theorem}
+
+\begin{proof}
+Let $e^{i\theta_1},\dots,e^{i\theta_d}$ be the eigenvalues of $U_0$
+and $e^{i\theta_{d+1}},\dots,e^{i\theta_{2d}}$ those of $U_1$. Apply
+Lemma~\ref{lem:dirichlet} to the $2d$ numbers $x_j=\theta_j/2\pi$ with
+$Q=\lceil16\pi/\delta\rceil$: there is an integer $p$ with
+$1\le p\le Q^{2d}$ and $\dz{p\theta_j/2\pi}\le1/Q$ for all $j$. By the
+diagonalization identity of Section~\ref{sec:notation} and
+Lemma~\ref{lem:scalar}(b),
+\[
+  \|U_b^p-I\|=\max_j\bigl|e^{ip\theta_j}-1\bigr|
+  \le2\pi\max_j\dz{p\theta_j/2\pi}\le\frac{2\pi}{Q}
+  \qquad(b=0,1).
+\]
+Suppose, for contradiction, that $n\ge p$. The string
+$z=0^{n-p}1^p$ differs from $0^n$ (as $p\ge1$), and by the reading
+convention $U(0^n)e_1=U_0^{\,p}\psi$ and $U(z)e_1=U_1^{\,p}\psi$,
+where $\psi=U_0^{\,n-p}e_1$ is a unit vector. By
+Lemma~\ref{lem:born} and the triangle inequality,
+\[
+  \bigl|\rho(0^n)-\rho(z)\bigr|
+  \le2\,\bigl\|(U_0^{\,p}-U_1^{\,p})\psi\bigr\|
+  \le2\bigl(\|U_0^{\,p}-I\|+\|I-U_1^{\,p}\|\bigr)
+  \le\frac{8\pi}{Q}\le\frac{8\pi\,\delta}{16\pi}=\frac\delta2<\delta,
+\]
+contradicting $\gapp(0^n)\ge\delta$. Hence $n<p\le Q^{2d}$, and
+$Q\le16\pi/\delta+1\le(16\pi+1)/\delta\le52/\delta$ using
+$\delta\le1$.
+\end{proof}
+
+\begin{corollary}\label{cor:unbounded}
+For every fixed $\delta>0$, $A_{Q,\delta}$ is unbounded, both along
+the cube-free strings and along the strings $0^n$.
+\end{corollary}
+
+\begin{remark}[Quantum locks wear out]\label{rem:wear}
+Theorem~\ref{thm:zeros} is an approximate-analysis sibling of the
+Jordan--Schur mechanism used in \cite{KH17} to prove the
+finite-group complexity $Q_f$ unbounded: there, powers of elements of
+a finite unitary group eventually commute exactly; here, powers of
+\emph{arbitrary} unitaries recur near the identity at a rate
+controlled only by the dimension. In the lock metaphor of
+\cite{KH17}: no fixed-dimensional quantum lock can maintain a fixed
+security margin against arbitrarily long codes---not even against the
+all-zeros code. The hypothesis of Theorem~\ref{thm:zeros} is tight in
+the sense that the margin, not the lock, must decay:
+$A_{Q,1}(0^n)\le n+1$, via $d=n+1$, $U_0$ the cyclic permutation
+$e_i\mapsto e_{i+1\bmod(n+1)}$, $U_1=I$, and accepting state
+$e_{n+1}$; then $U(z)e_1=e_{1+j\bmod(n+1)}$ where $j$ is the number of
+zeros in $z$, so $\rho(z)=1$ if $z=0^n$ and $\rho(z)=0$ for every
+other $z$ of length $n$, giving gap $1$. Numerically, the largest gap
+achievable for $0^n$ in dimension $2$ decays steadily
+($\approx0.53,\,0.36,\,0.28,\,0.18,\,0.16$ at
+$n=4,6,10,12,14$), in accordance with the theorem.
+\end{remark}
+
+\begin{remark}\label{rem:allwords}
+The two mechanisms plausibly combine. On one side, the proof of
+Theorem~\ref{thm:cubefree} shows more generally that if $w$ contains
+no $E$-th power ($E\ge3$), then no cell contains more than $E$ prefix
+states, giving $n+1\le E(35/\delta)^{2d}$ by the same argument with
+$E+1$ indices in place of four. On the other side, long powers invite
+the recurrence argument applied to $U(u)$ for the repeated block
+$u$. We expect, but have not proved, that
+$A_{Q,\delta}(w)=\Omega_\delta(\log|w|)$ for \emph{every} string $w$;
+the missing case is a string containing powers of intermediate
+exponent. If so, then in contrast with $A_{P,\delta}$---which
+separates periodic from aperiodic strings by staying bounded on the
+former---the quantum measure grows on everything, and the
+discriminating quantity becomes the \emph{decay rate} of the best gap
+at fixed dimension. Our experiments are consistent with a stark
+difference in rate: gently polynomial for $0^n$, much faster for
+aperiodic strings.
+\end{remark}
+
+\begin{question}\label{q:rate}
+What is the growth rate of $A_{Q,\delta}$ along the Thue--Morse
+prefixes, and along $0^n$, for fixed $\delta$? Both are between
+$\Omega_\delta(\log n)$ and $O(n^2)$
+(Proposition~\ref{prop:quadupper}; for $0^n$, indeed $O(n)$ by
+Remark~\ref{rem:wear}), and we do not know whether a fixed gap can be
+maintained in polylogarithmic dimension on any infinite family of
+strings.
+\end{question}
+
+\begin{remark}
+Like Theorem~\ref{thm:all} (Remark~\ref{rem:alphabets}), the results
+of this section extend verbatim to arbitrary finite alphabets; over a
+ternary alphabet, square-free strings give Theorem~\ref{thm:cubefree}
+with $2$ points per cell in place of $3$, using square-freeness in
+place of cube-freeness.
+\end{remark}
+
+\section{Computational aspects}\label{sec:complexity}
+
+The preceding sections concern the \emph{values} of $\AQ$ and
+$A_{Q,\delta}$; we now locate their computational difficulty. In
+outline: the string-maximization problem underlying witness
+verification is NP-complete, with inverse-polynomial robustness and
+exact rational acceptance values (Theorem~\ref{thm:nphard});
+verification of $\delta$-witnesses is coNP-complete
+(Corollary~\ref{cor:conp}); the synthesis promise problem lies in
+$\Sigma_2^p$ (Proposition~\ref{prop:sigma2}); and the exact value
+$A_{Q,\delta}(w)$ is computable in exponential time, via quantifier
+elimination over the reals together with a quadratic universal upper
+bound (Propositions~\ref{prop:quadupper} and~\ref{prop:exact}).
+
+Throughout this section, an \emph{exact instance} presents the entries
+of $U_0,U_1$ as elements of a number field of degree $O(1)$ over
+$\Q$, by rational coordinates of polynomial bit-size in a fixed
+basis; a \emph{rational instance} presents rational entries. The
+dimension $d$ and the length $n$ are given in unary.
+
+\begin{lemma}[Clocking]\label{lem:clock}
+Let $W_{b,m}\in U(B)$ be given for $b\in\{0,1\}$ and $1\le m\le n$.
+On $\C^{n+1}\otimes\C^B$ define
+\[
+  U_b \;=\; \sum_{m=1}^{n} |m{+}1\rangle\langle m| \otimes W_{b,m}
+  \;+\; |1\rangle\langle n{+}1| \otimes I .
+\]
+Then $U_0,U_1$ are unitary, and with start state $|1\rangle\otimes
+e_1$ and accepting state $|n{+}1\rangle\otimes e_{k'}$, every
+$z\in\{0,1\}^n$ satisfies
+\[
+  \rho(z)=\bigl|\langle e_{k'}|\,W_{z_n,n}\cdots W_{z_1,1}\,
+  e_1\rangle\bigr|^2 .
+\]
+Thus an MO-QFA can execute an arbitrary position-dependent gate
+sequence, at a factor $n+1$ in dimension.
+\end{lemma}
+
+\begin{proof}
+Unitarity: $U_b^\dagger U_b=\sum_{m=1}^n|m\rangle\langle m|\otimes
+W_{b,m}^\dagger W_{b,m}+|n{+}1\rangle\langle n{+}1|\otimes I=I$, since
+the clock summands act on orthogonal blocks. By induction on $m$, the
+state after reading $z_1\cdots z_m$ is $|m{+}1\rangle\otimes
+W_{z_m,m}\cdots W_{z_1,1}e_1$: the wrap-around term
+$|1\rangle\langle n{+}1|$ is never activated on inputs of length
+exactly $n$.
+\end{proof}
+
+\begin{proposition}[Quadratic upper bound]\label{prop:quadupper}
+For every $w\in\{0,1\}^n$ and every $\delta\in(0,1]$,
+\[
+  A_{Q,\delta}(w)\;\le\;A_{Q,1}(w)\;\le\;(n+1)^2 .
+\]
+\end{proposition}
+
+\begin{proof}
+Apply Lemma~\ref{lem:clock} with work register $\C^{n+1}$, basis
+$|0\rangle,\dots,|n\rangle$, cyclic increment
+$C|c\rangle=|c+1\bmod (n{+}1)\rangle$, and
+$W_{b,m}=C^{[\,b\ne w_m\,]}$: a mismatch counter. After reading $z$
+the work state is $|d_H(z,w)\bmod(n{+}1)\rangle=|d_H(z,w)\rangle$,
+where $d_H$ is Hamming distance and $d_H\le n$. With accepting state
+$|n{+}1\rangle\otimes|0\rangle$ we get $\rho(z)=1$ if $z=w$ and
+$\rho(z)=0$ otherwise: gap $1$ in dimension $(n+1)^2$. (For $0^n$,
+Remark~\ref{rem:wear} improves this to $n+1$.)
+\end{proof}
+
+\begin{lemma}[Stability]\label{lem:stability}
+Let $U_0,U_1\in U(d)$, let $\widetilde U_0,\widetilde U_1$ be
+arbitrary matrices with $\|\widetilde U_b-U_b\|\le\tau\le\frac1{2n}$,
+and let $\widetilde\rho$ be defined from the $\widetilde U_b$ by the
+same formula as $\rho$. Then:
+\begin{enumerate}
+\item $|\widetilde\rho(z)-\rho(z)|\le6n\tau$ for every
+  $z\in\{0,1\}^n$;
+\item if moreover $\|\widetilde U_b^\dagger\widetilde U_b-I\|
+  \le\varepsilon<1$, then there are unitaries $W_b$ with
+  $\|\widetilde U_b-W_b\|\le\varepsilon$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(1) Telescoping,
+$\widetilde U(z)-U(z)=\sum_{m=1}^n
+\widetilde U_{z_n}\cdots\widetilde U_{z_{m+1}}
+(\widetilde U_{z_m}-U_{z_m})U_{z_{m-1}}\cdots U_{z_1}$,
+and $\|\widetilde U_b\|\le1+\tau$, so each summand has norm at most
+$(1+\tau)^{n}\tau\le e^{n\tau}\tau\le e^{1/2}\tau\le2\tau$
+(Lemma~\ref{lem:scalar}(a)); hence
+$\|\widetilde U(z)e_1-U(z)e_1\|\le2n\tau$. With
+$a=\langle e_k|U(z)e_1\rangle$ and
+$\tilde a=\langle e_k|\widetilde U(z)e_1\rangle$ we have $|a|\le1$,
+$|\tilde a|\le(1+\tau)^n\le2$, and
+$\bigl||\tilde a|^2-|a|^2\bigr|\le(|\tilde a|+|a|)|\tilde a-a|
+\le3\cdot2n\tau$.
+(2) Let $\widetilde U_b=W_bP_b$ be a polar decomposition with $W_b$
+unitary and $P_b=(\widetilde U_b^\dagger\widetilde U_b)^{1/2}$
+positive (invertible since $\varepsilon<1$). Then
+$\|\widetilde U_b-W_b\|=\|P_b-I\|
+=\max_\lambda|\sqrt\lambda-1|\le\max_\lambda|\lambda-1|
+=\|\widetilde U_b^\dagger\widetilde U_b-I\|\le\varepsilon$,
+using $|\sqrt x-1|\le|x-1|$ for $x\ge0$.
+\end{proof}
+
+\begin{lemma}[Prescribed first row]\label{lem:householder}
+For every real unit vector $r\in\R^D$ there is a real symmetric
+orthogonal matrix $H$ (a \emph{Householder reflection}) with
+$He_1=r$, hence with first row $r^{T}$; its entries are rational
+functions of the entries of $r$.
+\end{lemma}
+
+\begin{proof}
+If $r=e_1$, take $H=I$. Otherwise set $u=e_1-r\ne0$ and
+$H=I-\dfrac{2uu^{T}}{u^{T}u}$. Then $H$ is symmetric, and
+\[
+  H^2=I-\frac{4uu^{T}}{u^{T}u}+\frac{4u(u^{T}u)u^{T}}{(u^{T}u)^2}=I,
+\]
+so $H$ is orthogonal. Since $\|r\|=\|e_1\|=1$ we have
+$u^{T}u=2-2r_1=2\,u^{T}e_1$, whence
+\[
+  He_1=e_1-\frac{2u\,(u^{T}e_1)}{u^{T}u}=e_1-u=r ,
+\]
+and by symmetry the first row of $H$ is $(He_1)^{T}=r^{T}$.
+\end{proof}
+
+\subsection*{Maximization is NP-complete}
+
+\begin{definition}
+\textup{\textsc{QFA-MaxString}}: given $n$, $d$ (unary), an exact instance
+$(U_0,U_1)$, an accepting index $k$, and $\theta\in\Q$: is there
+$z\in\{0,1\}^n$ with $\rho(z)\ge\theta$?
+\end{definition}
+
+\begin{theorem}\label{thm:nphard}
+\textup{\textsc{QFA-MaxString}} is NP-hard, via a polynomial-time reduction
+from \textup{\textsc{3-Sat}} \cite{GJ79} under which, for a formula with $J$
+clauses,
+\[
+  \max_{z}\rho(z)=\frac{\mathrm{maxsat}(\varphi)^2}{7J^2}
+  \;\in\;\Q ,
+\]
+so that satisfiable instances attain $\max_z\rho=\frac17$ while
+unsatisfiable ones have
+$\max_z\rho\le\frac17\bigl(1-\frac1J\bigr)^2
+\le\frac17-\frac1{7J}$. Consequently NP-hardness holds even as a
+promise problem with inverse-polynomial gap; and the promise variant
+with rational instances exponentially close to unitary is
+NP-complete.
+\end{theorem}
+
+\begin{proof}
+Let $\varphi$ have variables $x_1,\dots,x_n$ and clauses
+$C_1,\dots,C_J$, each on three distinct variables. Identify strings
+$z\in\{0,1\}^n$ with truth assignments; note every string of length
+$n$ is a legal assignment. The work register is $\C^{8J}$ with basis
+$|j,y\rangle$, $j\in[J]$, $y\in\{0,1\}^3$; block $j$ will store the
+values of the three variables of $C_j$.
+
+\emph{Fan-out.} Let $F$ be the Householder reflection of
+Lemma~\ref{lem:householder} with
+$F|1,000\rangle=\frac1{\sqrt J}\sum_j|j,000\rangle$, taking the
+basis ordered with $|1,000\rangle$ first.
+
+\emph{Storage.} For $b\in\{0,1\}$ and $1\le m\le n$ let $P_{b,m}$ act
+on block $j$ by flipping stored bit $r$ whenever $b=1$ and $x_m$ is
+the $r$-th variable of $C_j$, and trivially otherwise; each $P_{b,m}$
+is a permutation matrix, and $P_{0,m}=I$. After reading $z$, block
+$j$ holds $|y_j\rangle$ with $y_j=z\!\restriction_{C_j}$, since each
+stored bit is toggled exactly when its variable is read with value
+$1$. No absorption occurs anywhere---by
+Theorem~\ref{thm:zeros} none is available---so the clause
+disjunctions are not computed during reading at all; they are scored
+by interference at the end.
+
+\emph{Fan-in.} A $3$-clause has exactly $7$ satisfying local
+assignments, so
+$v_j=\frac1{\sqrt7}\sum_{y\models C_j}|j,y\rangle$ is a unit vector,
+and $\frac1{\sqrt J}(v_1^\dagger,\dots,v_J^\dagger)$ is a unit row;
+let $G$ be the Householder reflection with this first row
+(Lemma~\ref{lem:householder} again).
+
+Apply Lemma~\ref{lem:clock} with $W_{b,1}=P_{b,1}F$,
+$W_{b,m}=P_{b,m}$ for $1<m<n$, $W_{b,n}=G\,P_{b,n}$, and accepting
+work vector $|1,000\rangle$. The final amplitude is
+\[
+  \frac1{\sqrt J}\sum_{j=1}^J\frac1{\sqrt J}\langle v_j|y_j\rangle
+  =\frac1J\sum_{j=1}^J\frac{[\,z\models C_j\,]}{\sqrt7},
+  \qquad\text{whence}\qquad
+  \rho(z)=\frac{\mathrm{sat}_\varphi(z)^2}{7J^2}
+\]
+exactly, for every $z\in\{0,1\}^n$. Taking $\theta=\frac17$ proves
+hardness, with the stated yes/no separation
+$\frac17-\frac17(1-\frac1J)^2=\frac{2J-1}{7J^2}\ge\frac1{7J}$. The
+dimension is $8J(n+1)$, and all entries lie in $\Q(\sqrt7,\sqrt J)$
+with polynomial bit-size, so the map is polynomial-time and the
+instance is exact; membership in NP for exact instances is immediate
+(guess $z$ and evaluate $\rho(z)$ by exact arithmetic in the given
+field). For the rational promise variant, replace $F$ and $G$ by
+entrywise rational approximations to accuracy $2^{-p}$,
+$p=\mathrm{poly}$: by Lemma~\ref{lem:stability} every $\rho(z)$
+moves by at most $6n\cdot O(2^{-p}d)$, preserving the $\frac1{7J}$
+promise gap, while verification becomes rational arithmetic with the
+tolerance absorbed by the promise.
+\end{proof}
+
+\subsection*{Witness verification is coNP-complete}
+
+We now show that verifying a claimed $\delta$-witness is
+coNP-complete. The reduction refines the machine of
+Theorem~\ref{thm:nphard} by a \emph{reference branch}: a reserved
+direction of the work register gives one designated string $w$ a
+tunable head start, so that the \emph{size of the gap} at
+$w$---rather than the maximum of $\rho$---encodes unsatisfiability.
+
+\begin{definition}[The referenced machine]\label{def:refmachine}
+Let $\varphi$ be a \textup{\textsc{3-Sat}} formula with $J$ clauses
+$C_1,\dots,C_J$, each on three distinct variables, in which every
+variable occurs in some clause (variables occurring in no clause may
+be deleted without affecting satisfiability). Let
+$x_1,\dots,x_{n-1}$ be its variables, let $x_n$ be a fresh variable
+occurring in no clause, and let $\mu\in(0,1)$ be a rational
+parameter. The machine $M_\varphi(\mu)$ is the clocked machine of
+Lemma~\ref{lem:clock} on the work register $\C^{8J+1}$, with basis
+$|j,y\rangle$ ($j\in[J]$, $y\in\{0,1\}^3$) together with one
+reserved vector $|\mathrm{ref}\rangle$, built from the following
+gates. All Householder reflections below exist by
+Lemma~\ref{lem:householder}, taking the basis ordered with the
+relevant vector first.
+\begin{itemize}
+\item \emph{Fan-out.} $F'$ is the Householder reflection with
+\[
+  F'\,|1,000\rangle
+  =\sqrt{1-\mu}\;\frac1{\sqrt J}\sum_{j=1}^J|j,000\rangle
+  +\sqrt{\mu}\;|\mathrm{ref}\rangle ,
+\]
+a legitimate target since its squared norm is $(1-\mu)+\mu=1$.
+\item \emph{Storage.} $P'_{b,m}=P_{b,m}\oplus[1]$, where $P_{b,m}$
+is the storage permutation of Theorem~\ref{thm:nphard}; thus the
+stored bits are updated exactly as before while
+$|\mathrm{ref}\rangle$ is fixed. Since $x_n$ occurs in no clause,
+$P'_{b,n}=I$ for both letters.
+\item \emph{Two fan-ins.} $G_0$ is the Householder reflection whose
+first row is $r_0^{T}$, where
+$r_0=\frac1{\sqrt J}\sum_{j}v_j$ with
+$v_j=\frac1{\sqrt7}\sum_{y\models C_j}|j,y\rangle$ as in
+Theorem~\ref{thm:nphard} (so $r_0$ vanishes on
+$|\mathrm{ref}\rangle$); and $G_1$ is the Householder reflection
+whose first row is $r_1^{T}$, where
+\[
+  r_1=\sqrt{\mu}\;\frac1{\sqrt J}\sum_{j=1}^J|j,000\rangle
+  +\sqrt{1-\mu}\;|\mathrm{ref}\rangle ,
+\]
+again a unit vector since $\mu+(1-\mu)=1$.
+\end{itemize}
+The letter gates are $W_{b,1}=P'_{b,1}F'$, $W_{b,m}=P'_{b,m}$ for
+$1<m<n$, $W_{0,n}=G_0P'_{0,n}$ and $W_{1,n}=G_1P'_{1,n}$; the
+accepting work vector is $|1,000\rangle$.
+\end{definition}
+
+\begin{lemma}[Acceptance function of the referenced
+machine]\label{lem:refaccept}
+Write each input as $z=ab$ with $a\in\{0,1\}^{n-1}$ and
+$b\in\{0,1\}$, and let
+\[
+  Z(a)\;=\;\#\{\,j\in[J]:\ a\text{ assigns }0\text{ to every
+  variable of }C_j\,\}.
+\]
+Then, for every $a$,
+\[
+  \rho(a0)=(1-\mu)\,\frac{\mathrm{sat}_\varphi(a)^2}{7J^2},
+  \qquad
+  \rho(a1)=\mu(1-\mu)\Bigl(1+\frac{Z(a)}J\Bigr)^{2}.
+\]
+Moreover $Z(a)=J$ if and only if $a=0^{n-1}$.
+\end{lemma}
+
+\begin{proof}
+By Lemma~\ref{lem:clock} it suffices to track the work register
+under $W_{z_n,n}\cdots W_{z_1,1}$. After the fan-out, the state is
+$\sqrt{1-\mu}\,\frac1{\sqrt J}\sum_j|j,000\rangle
++\sqrt\mu\,|\mathrm{ref}\rangle$. The storage gates act blockwise
+and fix $|\mathrm{ref}\rangle$, and---exactly as in
+Theorem~\ref{thm:nphard}---each stored bit is toggled precisely when
+its variable is read with value $1$; since $x_n$ occurs in no
+clause, the stored contents depend only on $a$. Hence the state
+reaching the position-$n$ fan-in is
+\[
+  \Psi(a)=\sqrt{1-\mu}\;\frac1{\sqrt J}\sum_{j=1}^J|j,y_j\rangle
+  +\sqrt{\mu}\;|\mathrm{ref}\rangle ,
+  \qquad y_j=a\!\restriction_{C_j}.
+\]
+If $b=0$, the accepting amplitude is
+\[
+  \langle r_0|\Psi(a)\rangle
+  =\sqrt{1-\mu}\;\frac1{J}\sum_{j=1}^J\langle v_j|j,y_j\rangle
+  =\sqrt{1-\mu}\;\frac{\mathrm{sat}_\varphi(a)}{J\sqrt7},
+\]
+since $\langle v_j|j,y_j\rangle=[\,y_j\models C_j\,]/\sqrt7$ and
+$y_j\models C_j$ iff $a\models C_j$, while $r_0$ has no
+$|\mathrm{ref}\rangle$ component. If $b=1$, the accepting amplitude
+is
+\[
+  \langle r_1|\Psi(a)\rangle
+  =\sqrt{\mu}\,\sqrt{1-\mu}\;\frac{Z(a)}J
+  +\sqrt{1-\mu}\,\sqrt{\mu}
+  =\sqrt{\mu(1-\mu)}\Bigl(1+\frac{Z(a)}J\Bigr),
+\]
+since $\langle j,000|j,y_j\rangle=[\,y_j=000\,]$. Squaring gives the
+two formulas.
+
+Finally, if $a_i=1$ for some $i$, then $x_i$ occurs in some clause
+$C_j$, so block $j$ holds $y_j\ne000$ and $Z(a)\le J-1$; conversely
+$a=0^{n-1}$ gives $y_j=000$ for every $j$, so $Z(a)=J$.
+\end{proof}
+
+\begin{lemma}[Separation]\label{lem:refsep}
+In the referenced machine, take
+\[
+  \mu:=\tfrac1{28}+\tfrac1{224J}
+  \qquad\text{(so that } 4\mu=\tfrac17+\tfrac1{56J}\text{)},
+  \qquad w:=0^{n-1}1 .
+\]
+Then:
+\begin{enumerate}
+\item $\rho(w)=4\mu(1-\mu)
+  =(1-\mu)\bigl(\tfrac17+\tfrac1{56J}\bigr)$;
+\item every $a$ satisfies
+  $\rho(a0)\le\frac{1-\mu}7=\rho(w)-\frac{1-\mu}{56J}$, with
+  equality if and only if $a$ satisfies $\varphi$;
+\item if $\varphi$ is unsatisfiable, every $a$ satisfies
+  $\rho(a0)\le\rho(w)-\frac{9(1-\mu)}{56J}$;
+\item every $a\ne0^{n-1}$ satisfies
+  $\rho(a1)\le\rho(w)-\frac{6(1-\mu)}{56J}$.
+\end{enumerate}
+In particular $w$ is the strict maximizer of $\rho$, for every
+$\varphi$.
+\end{lemma}
+
+\begin{proof}
+(1) By Lemma~\ref{lem:refaccept} with $Z(0^{n-1})=J$,
+$\rho(w)=\mu(1-\mu)\cdot2^2$, and
+$4\mu(1-\mu)=(1-\mu)\cdot4\mu
+=(1-\mu)\bigl(\tfrac17+\tfrac1{56J}\bigr)$.
+
+(2) From $\mathrm{sat}_\varphi(a)\le J$,
+$\rho(a0)\le(1-\mu)\frac{J^2}{7J^2}=\frac{1-\mu}7$, with equality
+iff $\mathrm{sat}_\varphi(a)=J$; and by (1),
+$\rho(w)-\frac{1-\mu}7
+=(1-\mu)\bigl(\tfrac17+\tfrac1{56J}-\tfrac17\bigr)
+=\frac{1-\mu}{56J}$.
+
+(3) Now $\mathrm{sat}_\varphi(a)\le J-1$, so
+$\rho(a0)\le\frac{1-\mu}7\bigl(1-\frac1J\bigr)^2$, and
+\[
+  \rho(w)-\frac{1-\mu}7\Bigl(1-\frac1J\Bigr)^{2}
+  =(1-\mu)\biggl[\frac1{56J}
+  +\frac17\Bigl(\frac2J-\frac1{J^2}\Bigr)\biggr]
+  \;\ge\;(1-\mu)\Bigl[\frac1{56J}+\frac1{7J}\Bigr]
+  =\frac{9(1-\mu)}{56J},
+\]
+using $\frac2J-\frac1{J^2}\ge\frac1J$, i.e.\
+$\frac1J\ge\frac1{J^2}$, valid for $J\ge1$.
+
+(4) By Lemma~\ref{lem:refaccept}, $Z(a)\le J-1$, and $\rho(a1)$ is
+increasing in $Z(a)$, so
+$\rho(a1)\le\mu(1-\mu)\bigl(2-\frac1J\bigr)^2$. Then
+\[
+  \rho(w)-\mu(1-\mu)\Bigl(2-\frac1J\Bigr)^{2}
+  =\mu(1-\mu)\Bigl(\frac4J-\frac1{J^2}\Bigr)
+  \;\ge\;\frac{3\mu(1-\mu)}J
+  =\frac{3\,\rho(w)}{4J}
+  \;\ge\;\frac3{4J}\cdot\frac{1-\mu}7
+  =\frac{6(1-\mu)}{56J},
+\]
+using first $\frac4J-\frac1{J^2}\ge\frac3J$ ($J\ge1$) and then
+$\rho(w)\ge\frac{1-\mu}7$ from (1).
+
+Strict maximality: every string other than $w$ is either of the form
+$a0$, covered by (2) with deficit at least $\frac{1-\mu}{56J}>0$, or
+of the form $a1$ with $a\ne0^{n-1}$, covered by (4).
+\end{proof}
+
+\begin{corollary}\label{cor:conp}
+The problem \textup{\textsc{GapVerify}}---given an exact (or
+promise-rational) witness datum $(U_0,U_1,k)$, a string $w$, and
+$\delta\in\Q$: is $\gapp(w)\ge\delta$?---is coNP-complete.
+\end{corollary}
+
+\begin{proof}
+Membership: a certificate for the complement is a single $z\ne w$
+with $\rho(w)-\rho(z)<\delta$, checkable by exact (respectively
+rational) arithmetic.
+
+Hardness, by reduction from the complement of
+\textup{\textsc{3-Sat}}: map $\varphi$ (preprocessed as in
+Definition~\ref{def:refmachine}) to the instance consisting of
+$M_\varphi(\mu)$, the string $w=0^{n-1}1$, and
+\[
+  \delta:=\frac{5(1-\mu)}{56J},
+  \qquad \mu=\tfrac1{28}+\tfrac1{224J} .
+\]
+If $\varphi$ is satisfiable, a satisfying assignment $a$ attains
+equality in Lemma~\ref{lem:refsep}(2), so
+$\gapp(w)\le\frac{1-\mu}{56J}<\delta$. If $\varphi$ is
+unsatisfiable, then by Lemma~\ref{lem:refsep}(3) and (4) every
+$z\ne w$ satisfies
+$\rho(z)\le\rho(w)-\frac{6(1-\mu)}{56J}\le\rho(w)-\delta$, so
+$\gapp(w)\ge\delta$. By the last clause of
+Lemma~\ref{lem:refsep}, the constructed datum is a genuine witness
+for $w$ in both cases: only its $\delta$-quality encodes
+satisfiability, so the reduction cannot be defeated by rejecting
+malformed witnesses.
+
+The map is polynomial-time: $\mu$ is rational, the dimension is
+$(8J+1)(n+1)$, and by Lemma~\ref{lem:householder} all entries are
+rational functions of $\sqrt\mu$, $\sqrt{1-\mu}$, $\sqrt7$ and
+$\sqrt J$, a number field of degree $O(1)$ presented by
+polynomial-size rational coordinates. The margins on the two sides
+of $\delta$ are at least $\frac{1-\mu}{56J}=\Theta(1/J)$, so the
+rationalization of Lemma~\ref{lem:stability} applies verbatim. (The
+construction and these parameter choices were verified by machine
+on satisfiable and unsatisfiable instances.)
+\end{proof}
+
+\subsection*{Upper bounds for synthesis}
+
+\begin{proposition}\label{prop:sigma2}
+The promise problem---given $w\in\{0,1\}^n$, $d$ in unary, and
+rationals $\delta,\eta$ with $0<\eta\le\delta\le1$: accept if some
+$d$-dimensional witness for $w$ has $\gapp\ge\delta$, reject if every
+$d$-dimensional unitary triple has $\gapp\le\delta-\eta$---is in
+$\Sigma_2^p$. For each fixed $d$ it is in
+$\mathrm{P}^{\mathrm{NP}}$ when $\eta\ge1/\mathrm{poly}(n)$.
+\end{proposition}
+
+\begin{proof}
+Set $\tau=\eta/(60n)$ and let $\Gamma$ be the grid of matrix pairs
+whose entries are Gaussian rationals with real and imaginary parts
+multiples of $\gamma=\tau/(2d)$ and of modulus at most $2$: elements
+of $\Gamma$ have polynomial bit-size. The $\Sigma_2^p$ certificate is
+a pair $(\widetilde U_0,\widetilde U_1)\in\Gamma$ together with $k$,
+checked as follows in polynomial time with one universal quantifier:
+(i) $\|\widetilde U_b^\dagger\widetilde U_b-I\|_F\le2\tau$; (ii) for
+all $z\ne w$: $\widetilde\rho(w)-\widetilde\rho(z)\ge\delta-\eta/2$
+(a coNP predicate, by exact rational arithmetic). If some true
+witness has gap $\ge\delta$, rounding its entries to $\Gamma$
+perturbs each $U_b$ by at most $d\gamma=\tau/2$ in Frobenius, hence
+operator, norm; then (i) holds and, by
+Lemma~\ref{lem:stability}(1), each $\widetilde\rho(z)$ is within
+$3n\tau=\eta/20$ of $\rho(z)$, so (ii) holds. Conversely if some
+certificate passes, Lemma~\ref{lem:stability}(2) yields unitaries
+$W_b$ within $2\tau$ of $\widetilde U_b$, whose gap is at least
+$(\delta-\eta/2)-2\cdot12n\tau=\delta-\eta/2-2\eta/5>\delta-\eta$,
+so the instance is not a reject instance. For fixed $d$ and
+$\eta\ge1/\mathrm{poly}$, the grid has
+$(O(1/\gamma))^{4d^2}=\mathrm{poly}(n)$ elements; enumerate it and
+decide predicate (ii) for each element with one NP-oracle query.
+\end{proof}
+
+\begin{proposition}\label{prop:exact}
+For rational $\delta\in(0,1]$, the exact value $A_{Q,\delta}(w)$ is
+computable, in deterministic time
+$2^{O(n\cdot A_{Q,\delta}(w)^2)}\subseteq2^{O(n^5)}$; likewise
+$\AQ(w)$.
+\end{proposition}
+
+\begin{proof}
+First, the best gap is monotone in $d$: padding $U_b\mapsto
+U_b\oplus I_{d'-d}$ preserves every amplitude
+$\langle e_k|U(z)e_1\rangle$, so a $d$-dimensional witness yields a
+$d'$-dimensional one. Second, for each fixed $d$ the predicate
+``some $d$-dimensional witness for $w$ has $\gapp\ge\delta$'' is a
+sentence of the existential theory of the reals: $8d^2$ real
+variables (real and imaginary parts), $4d^2$ polynomial equations of
+degree $2$ expressing $U_b^\dagger U_b=I$, and $2^n-1$ polynomial
+inequalities of degree $2n$ expressing the gaps, with coefficients of
+bit-size $\mathrm{poly}(n)$. By Renegar's decision procedure
+\cite{Ren92} this sentence is decidable in time
+$\bigl(2^n\cdot n\bigr)^{O(d^2)}=2^{O(nd^2)}$. Search
+$d=2,3,\dots$; by Proposition~\ref{prop:quadupper} the search
+terminates by $d=(n+1)^2$, and it stops at $d=A_{Q,\delta}(w)$, for
+the stated bound. For $\AQ$, replace the gap inequalities by strict
+ones and $\delta$ by $0$; termination via
+$\AQ(w)\le A_{Q,1}(w)\le(n+1)^2$.
+\end{proof}
+
+\begin{remark}\label{rem:lit}
+The classical analogue of Theorem~\ref{thm:nphard}---the most
+probable string for a probabilistic automaton---is NP-hard by
+Casacuberta and de la Higuera \cite{CH00}. The quantum statement has
+some pleasant additional features: every string of length $n$ is a
+legal input (no consensus-string padding), the acceptance values are
+exact rationals $\mathrm{sat}^2/(7J^2)$ (hardness owes nothing to
+numerical precision), and the promise gap is inverse-linear. The
+mechanism is the obstruction of Theorem~\ref{thm:zeros} turned from
+bug into feature: unable to compute clause disjunctions by
+absorption, the machine stores literals reversibly and scores all
+clauses simultaneously, by interference, at measurement time. For
+unbounded input length, Blondel, Jeandel, Koiran and Portier
+\cite{BJKP05} showed that strict-cutpoint emptiness for measure-once
+QFAs is decidable while the non-strict version is undecidable;
+fixing the length trivializes decidability, and this section locates
+the residual complexity.
+\end{remark}
+
+\begin{question}\label{q:complexity}
+Two questions remain open. (a) Is \textup{\textsc{QFA-MaxString}} hard for
+\emph{fixed} dimension---in particular $d=2$, where the acceptance
+function is $\rho(z)=|\langle e_k|U(z)e_1\rangle|^2$ for a product of
+$2\times2$ matrices and, by Theorem~\ref{thm:all}, every string is
+the maximizer for a suitable initial state? The reduction of
+Theorem~\ref{thm:nphard} needs $d=8J(n+1)$. (b) What is the
+complexity of computing $A_{Q,\delta}(w)$ from the bare input
+$(w,\delta)$? No hardness is known; encoding computation into a
+\emph{string}, rather than into an automaton, is precisely the
+obstacle that has left the complexity of Shallit--Wang automatic
+complexity \cite{SW01} open. (By Theorem~\ref{thm:all} the
+unparameterized value $\AQ(w)=2$ is trivial to compute.)
+\end{question}
+
+\section*{Acknowledgments}
+
+The results in this note were found in conversation with, and verified
+computationally by, Claude Fable 5 (Anthropic); the exhaustive check
+of Remark~\ref{rem:universal}, and the reduction of
+Section~\ref{sec:complexity} together with the parameter choices in
+Corollary~\ref{cor:conp}, were machine-verified. The author thanks Kenneth Gill, whose paper \cite{Gill24}
+prompted this line of work. This work was supported by a travel grant
+from the Simons Foundation for the period 2026--2031.
+
+\begin{thebibliography}{9}
+
+\bibitem{AS03}
+J.-P.~Allouche and J.~Shallit,
+\emph{Automatic sequences: theory, applications, generalizations},
+Cambridge University Press, Cambridge, 2003.
+
+\bibitem{BJKP05}
+V.~D.~Blondel, E.~Jeandel, P.~Koiran, and N.~Portier,
+\emph{Decidable and undecidable problems about quantum automata},
+SIAM J.\ Comput.\ \textbf{34} (2005), no.~6, 1464--1473.
+
+\bibitem{CH00}
+F.~Casacuberta and C.~de~la~Higuera,
+\emph{Computational complexity of problems on probabilistic grammars
+and transducers}, in: Grammatical Inference: Algorithms and
+Applications (ICGI 2000), Lecture Notes in Computer Science 1891,
+Springer, 2000, pp.~15--24.
+
+\bibitem{GJ79}
+M.~R.~Garey and D.~S.~Johnson,
+\emph{Computers and intractability: a guide to the theory of
+NP-completeness}, W.~H.~Freeman, San Francisco, 1979.
+
+\bibitem{Gill24}
+K.~Gill,
+\emph{Probabilistic automatic complexity of finite strings},
+arXiv:2402.13376 [cs.FL], 2024.
+
+\bibitem{KH17}
+B.~Kjos-Hanssen,
+\emph{Superposition as memory: unlocking quantum automatic complexity},
+arXiv:1703.04878 [cs.CC], 2017.
+
+\bibitem{KHpfa}
+B.~Kjos-Hanssen,
+\emph{Every string has probabilistic automatic complexity at most
+three}, preprint, 2026.
+
+\bibitem{Lothaire}
+M.~Lothaire,
+\emph{Combinatorics on words},
+Cambridge Mathematical Library, Cambridge University Press, 1997.
+
+\bibitem{LS62}
+R.~C.~Lyndon and M.-P.~Sch\"utzenberger,
+\emph{The equation $a^M=b^Nc^P$ in a free group},
+Michigan Math.\ J.\ \textbf{9} (1962), 289--298.
+
+\bibitem{MC00}
+C.~Moore and J.~P.~Crutchfield,
+\emph{Quantum automata and quantum grammars},
+Theoret.\ Comput.\ Sci.\ \textbf{237} (2000), 275--306.
+
+\bibitem{Ren92}
+J.~Renegar,
+\emph{On the computational complexity and geometry of the first-order
+theory of the reals, Parts I--III},
+J.\ Symbolic Comput.\ \textbf{13} (1992), 255--352.
+
+\bibitem{Sw58}
+S.~\'Swierczkowski,
+\emph{On a free group of rotations of the Euclidean space},
+Indag.\ Math.\ \textbf{20} (1958), 376--378.
+
+\bibitem{SW01}
+J.~Shallit and M.-W.~Wang,
+\emph{Automatic complexity of strings},
+J.\ Autom.\ Lang.\ Comb.\ \textbf{6} (2001), no.~4, 537--554.
+
+\bibitem{Wagon}
+S.~Wagon,
+\emph{The Banach--Tarski paradox},
+Encyclopedia of Mathematics and its Applications 24, Cambridge
+University Press, 1985.
+
+\end{thebibliography}
+
+\end{document}
