@@ -258,4 +258,22 @@ theorem AQ_eq_two (w : List (Fin 2)) (hw : w ≠ []) : AQ w = 2 := by
   by_contra h
   exact not_hasQuantumWitness_of_le_one w hw d (by omega) hd
 
+theorem AQ_empty : AQ [] = 1 := by
+  suffices sInf {y : ℕ | y ≠ 0} = 1 by
+    simp [AQ, HasQuantumWitness, IsQuantumWitness]
+    convert this with x
+    constructor
+    · intro h _
+      subst x
+      simp at h
+    · intro h
+      constructor
+      · apply Fin.pos_iff_nonempty.mp
+        omega
+      · use ⟨0, by omega⟩
+  refine (Nat.sInf_upward_closed_eq_succ_iff ?_ 0).mpr ?_
+  simp
+  omega
+  simp
+
 end QuantumAutomatic
